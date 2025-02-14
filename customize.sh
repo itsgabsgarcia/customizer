@@ -68,50 +68,52 @@ echo "[*] Configurando Git globalmente..."
 git config --global user.name "$GIT_NAME"
 git config --global user.email "$GIT_EMAIL"
 
-# Create configuration directories
+# Clonar el repositorio de configuraciones
+echo "[*] Clonando repositorio de configuraciones..."
+REPO_URL="https://github.com/itsgabsgarcia/customizer.git"
+TEMP_DIR="/tmp/customizer"
+git clone "$REPO_URL" "$TEMP_DIR"
+
+# Crear directorios de configuración
 mkdir -p "$HOME/.config/tmux"
 mkdir -p "$HOME/.config/vim"
 mkdir -p "$HOME/.local/bin"
 
-# Copy configuration files
+# Copiar configuraciones desde el repositorio clonado
 echo "[*] Copiando archivos de configuración..."
-cat > "$HOME/.config/tmux/tmux.conf" << 'EOF'
-set-option -g history-limit 5000
-set-option -g mouse on
-set-option -g default-terminal 'screen-256color'
-EOF
+if [ -d "$TEMP_DIR" ]; then
+    # Copiar configuración de tmux
+    if [ -f "$TEMP_DIR/tmux.conf" ]; then
+        cp "$TEMP_DIR/tmux.conf" "$HOME/.config/tmux/tmux.conf"
+    else
+        log_error "TMUX" "Archivo de configuración no encontrado" "tmux.conf no existe en el repositorio"
+    fi
 
-cat > "$HOME/.config/vim/vimrc" << 'EOF'
-syntax on
-set number
-set tabstop=4
-set expandtab
-EOF
+    # Copiar configuración de vim
+    if [ -f "$TEMP_DIR/vimrc" ]; then
+        cp "$TEMP_DIR/vimrc" "$HOME/.config/vim/vimrc"
+    else
+        log_error "VIM" "Archivo de configuración no encontrado" "vimrc no existe en el repositorio"
+    fi
 
-cat > "$HOME/.bash_aliases" << 'EOF'
-# Listing aliases
-alias l='ls -lah --group-directories-first'
-alias ls='ls --color=auto'
+    # Copiar alias
+    if [ -f "$TEMP_DIR/bash_aliases" ]; then
+        cp "$TEMP_DIR/bash_aliases" "$HOME/.bash_aliases"
+    else
+        log_error "ALIAS" "Archivo de alias no encontrado" "bash_aliases no existe en el repositorio"
+    fi
+else
+    log_error "REPOSITORIO" "No se pudo clonar el repositorio" "Error al clonar $REPO_URL"
+fi
 
-# Search scripts
-alias ?='duck'
-alias ??='bing'
-alias ???='google'
+# Crear enlaces simbólicos para los archivos de configuración
+ln -sf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
+ln -sf "$HOME/.config/vim/vimrc" "$HOME/.vimrc"
 
-# Editor aliases
-alias vi='vim'
+# Limpiar directorio temporal
+rm -rf "$TEMP_DIR"
 
-# Download alias
-alias download='curl -sSLOfk'
-
-# Clipboard alias
-alias xc='xclip -selection clipboard'
-
-# Clear terminal
-alias c='clear'
-EOF
-
-# Create search scripts with lynx
+# Crear scripts de búsqueda con lynx
 cat << 'INNER' > "$HOME/.local/bin/duck"
 #!/bin/bash
 search_query=$(echo "$*" | sed 's/ /+/g')
@@ -132,11 +134,7 @@ INNER
 
 chmod +x "$HOME/.local/bin/duck" "$HOME/.local/bin/bing" "$HOME/.local/bin/google"
 
-# Create symbolic links for config files
-ln -sf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
-ln -sf "$HOME/.config/vim/vimrc" "$HOME/.vimrc"
-
-# Check installed packages
+# Verificar paquetes instalados
 echo -e "\n[*] Verificando instalación de paquetes:"
 PACKAGES=(
     "kitty"
@@ -155,7 +153,7 @@ for pkg in "${PACKAGES[@]}"; do
     fi
 done
 
-# Check configuration files
+# Verificar archivos de configuración
 echo -e "\n[*] Verificando archivos de configuración:"
 CONFIG_FILES=(
     "$HOME/.tmux.conf"
@@ -175,7 +173,7 @@ for file in "${CONFIG_FILES[@]}"; do
     fi
 done
 
-# Check if critical services are running
+# Verificar servicios críticos
 echo -e "\n[*] Verificando servicios críticos:"
 SERVICES=("docker")
 
@@ -186,14 +184,14 @@ for service in "${SERVICES[@]}"; do
     fi
 done
 
-# Check user groups
+# Verificar grupos de usuario
 echo -e "\n[*] Verificando grupos de usuario:"
 if ! groups "$USER" | grep -q "docker"; then
     groups_output=$(groups "$USER")
     log_error "GRUPOS" "Usuario no está en el grupo docker" "Grupos actuales: $groups_output"
 fi
 
-# Display final error report
+# Mostrar reporte final de errores
 echo -e "\n[*] Reporte detallado de errores encontrados:"
 if [ ${#ERROR_LOG[@]} -eq 0 ]; then
     echo "No se encontraron errores durante la instalación."
@@ -210,7 +208,7 @@ else
     echo "Errores de grupos: $(echo "${ERROR_LOG[@]}" | grep -c "GRUPOS")"
 fi
 
-# Final recommendations
+# Recomendaciones finales
 if [ ${#ERROR_LOG[@]} -gt 0 ]; then
     echo -e "\n[*] Recomendaciones:"
     echo "1. Para errores de paquetes: sudo apt install -f"
